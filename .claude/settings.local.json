@@ -1,0 +1,25 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node -e \"const fs=require\\('fs'\\); const src=fs.readFileSync\\('src/app.jsx','utf8'\\); try{require\\('@babel/core'\\).transformSync\\(src,{presets:['@babel/preset-react']}\\); console.log\\('app.jsx OK'\\);}catch\\(e\\){console.log\\('app.jsx ERR:',e.message\\);}\")",
+      "Bash(node -e \"const fs=require\\('fs'\\); ['src/app.jsx','src/primitives.jsx'].forEach\\(f=>{const s=fs.readFileSync\\(f,'utf8'\\);let o=0,c=0,sq=0,cu=0;for\\(const ch of s\\){if\\(ch==='{'\\)cu++;else if\\(ch==='}'\\)cu--;else if\\(ch==='\\('\\)o++;else if\\(ch==='\\)'\\)c++;else if\\(ch==='['\\)sq++;else if\\(ch===']'\\)sq--;}console.log\\(f,'braces:',cu,'paren:',o-c,'brackets:',sq,'len:',s.length\\);}\\);\")",
+      "Bash(pkill -f \"http.server 8765\")",
+      "Bash(awk 'NR<891 || NR>1119' src/app.jsx)",
+      "Bash(mv src/app.jsx.tmp src/app.jsx)",
+      "Bash(node -e \"const fs=require\\('fs'\\); ['src/app.jsx','src/primitives.jsx'].forEach\\(f=>{const s=fs.readFileSync\\(f,'utf8'\\);let cu=0,p=0,sq=0;for\\(const ch of s\\){if\\(ch==='{'\\)cu++;else if\\(ch==='}'\\)cu--;else if\\(ch==='\\('\\)p++;else if\\(ch==='\\)'\\)p--;else if\\(ch==='['\\)sq++;else if\\(ch===']'\\)sq--;}console.log\\(f,'braces:',cu,'paren:',p,'brackets:',sq,'len:',s.length\\);}\\);\")",
+      "Bash(ffprobe -v quiet -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 car_rotation.mp4)",
+      "Bash(which ffmpeg *)",
+      "Bash(where ffmpeg *)",
+      "PowerShell(winget --version 2>$null)",
+      "PowerShell(if \\($?\\) { \"winget OK\" } else { \"winget not available\" })",
+      "PowerShell(winget install --id Gyan.FFmpeg --source winget --accept-package-agreements --accept-source-agreements)",
+      "PowerShell($env:PATH = [System.Environment]::GetEnvironmentVariable\\(\"PATH\", \"Machine\"\\) + \";\" + [System.Environment]::GetEnvironmentVariable\\(\"PATH\", \"User\"\\); ffmpeg -version 2>&1 | Select-Object -First 1)",
+      "PowerShell($env:PATH = [System.Environment]::GetEnvironmentVariable\\(\"PATH\", \"Machine\"\\) + \";\" + [System.Environment]::GetEnvironmentVariable\\(\"PATH\", \"User\"\\); New-Item -ItemType Directory -Path \"D:\\\\Downloads\\\\Car-meet-website\\\\frames\" -Force | Out-Null; Write-Host \"Folder creat. Incep extragerea frame-urilor...\"; Set-Location \"D:\\\\Downloads\\\\Car-meet-website\"; ffmpeg -i car_rotation.webp -vf \"fps=25,scale=1280:-1\" frames/frame_%04d.webp -y 2>&1 | Select-String -Pattern \"\\(frame=|error|Error|invalid\\)\" | Select-Object -Last 5)",
+      "PowerShell($env:PATH = [System.Environment]::GetEnvironmentVariable\\(\"PATH\", \"Machine\"\\) + \";\" + [System.Environment]::GetEnvironmentVariable\\(\"PATH\", \"User\"\\); Set-Location \"D:\\\\Downloads\\\\Car-meet-website\"; ffprobe -v quiet -show_entries format=duration:stream=nb_frames,r_frame_rate -of default=noprint_wrappers=1 car_rotation.mp4 2>&1)",
+      "PowerShell($env:PATH = [System.Environment]::GetEnvironmentVariable\\(\"PATH\", \"Machine\"\\) + \";\" + [System.Environment]::GetEnvironmentVariable\\(\"PATH\", \"User\"\\); Set-Location \"D:\\\\Downloads\\\\Car-meet-website\"; ffmpeg -i car_rotation.mp4 -t 6 -vf \"fps=25,scale=1920:-1\" -q:v 90 frames/frame_%04d.webp -y 2>&1 | Select-String -Pattern \"\\(frame=|Error|error\\)\" | Select-Object -Last 3)",
+      "Bash(gh auth *)",
+      "PowerShell(gh auth status 2>&1)",
+      "PowerShell(winget install --id GitHub.cli --source winget --accept-package-agreements --accept-source-agreements)"
+    ]
+  }
+}

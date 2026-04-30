@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>DROPDOWN ROMANIA — ARE YOU DOWN FOR IT!?</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg-deep: #06060A;
+    --bg-card: rgba(255,255,255,0.02);
+    --accent: #3B82F6;
+    --accent-dim: rgba(59,130,246,0.12);
+    --accent-glow: rgba(59,130,246,0.35);
+    --indigo: #6366F1;
+    --text-primary: #FFFFFF;
+    --text-secondary: rgba(255,255,255,0.6);
+    --text-muted: rgba(255,255,255,0.3);
+    --text-ghost: rgba(255,255,255,0.06);
+    --border: rgba(255,255,255,0.06);
+    --danger: #EF4444;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    background: var(--bg-deep);
+    color: var(--text-primary);
+    font-family: 'Outfit', sans-serif;
+    /* overflow-x: clip (NOT hidden) — hidden creates a scrolling context that breaks position:sticky */
+    overflow-x: clip;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  /* Legacy fallback for browsers without overflow: clip (older Safari) */
+  @supports not (overflow-x: clip) {
+    html, body { overflow-x: hidden; }
+  }
+  /* Racing grid background — fixed, parallax feel */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background:
+      radial-gradient(ellipse at 50% 0%, rgba(59,130,246,0.08), transparent 55%),
+      linear-gradient(rgba(59,130,246,0.035) 1px, transparent 1px) 0 0 / 60px 60px,
+      linear-gradient(90deg, rgba(59,130,246,0.035) 1px, transparent 1px) 0 0 / 60px 60px;
+    pointer-events: none;
+    z-index: 0;
+    mask-image: radial-gradient(ellipse at 50% 40%, #000 30%, transparent 85%);
+    -webkit-mask-image: radial-gradient(ellipse at 50% 40%, #000 30%, transparent 85%);
+  }
+  body > * { position: relative; z-index: 1; }
+  ::selection { background: var(--accent); color: #fff; }
+  a { color: inherit; text-decoration: none; }
+  button { font-family: inherit; border: none; background: none; color: inherit; cursor: pointer; }
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: #000; }
+  ::-webkit-scrollbar-thumb { background: rgba(59,130,246,0.3); }
+
+  @keyframes headlight-sway {
+    0%, 100% { transform: translateX(-50%) rotate(-2deg); opacity: 0.55; }
+    50% { transform: translateX(-50%) rotate(2deg); opacity: 0.75; }
+  }
+  @keyframes headlight-sway-r {
+    0%, 100% { transform: translateX(-50%) rotate(2deg); opacity: 0.55; }
+    50% { transform: translateX(-50%) rotate(-2deg); opacity: 0.75; }
+  }
+  @keyframes pulse-glow {
+    0%, 100% { opacity: 0.35; transform: scale(1); }
+    50% { opacity: 0.65; transform: scale(1.08); }
+  }
+  @keyframes exhaust-drift {
+    0%   { transform: translate(0, 100vh) scale(0.6); opacity: 0; }
+    10%  { opacity: 1; }
+    90%  { opacity: 0.5; }
+    100% { transform: translate(var(--drift, 40px), -10vh) scale(1.3); opacity: 0; }
+  }
+  @keyframes marquee-l { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+  @keyframes marquee-r { from { transform: translateX(-50%); } to { transform: translateX(0); } }
+  @keyframes spin-slow { from { transform: rotate(0); } to { transform: rotate(360deg); } }
+  @keyframes spin-rev  { from { transform: rotate(360deg); } to { transform: rotate(0); } }
+  @keyframes scroll-bounce {
+    0%, 100% { transform: translateY(0); opacity: 0.6; }
+    50% { transform: translateY(8px); opacity: 1; }
+  }
+  @keyframes badge-in {
+    0% { transform: scale(0.8); opacity: 0; }
+    100% { transform: scale(1); opacity: 1; }
+  }
+  @keyframes nav-in {
+    from { transform: translateY(-16px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+  }
+  @keyframes glow-breathe {
+    0%, 100% { box-shadow: 0 0 28px rgba(59,130,246,0.35), inset 0 1px 0 rgba(255,255,255,0.15); }
+    50%      { box-shadow: 0 0 48px rgba(59,130,246,0.55), inset 0 1px 0 rgba(255,255,255,0.22); }
+  }
+  @keyframes draw-arc {
+    from { stroke-dashoffset: 200; }
+    to   { stroke-dashoffset: 0; }
+  }
+  @keyframes car-drive {
+    0%   { transform: translateX(-10%); }
+    100% { transform: translateX(110vw); }
+  }
+  @keyframes tire-slide {
+    from { background-position: 0 0; }
+    to   { background-position: 120px 0; }
+  }
+  @keyframes shimmer-line {
+    0%   { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
+  }
+  @keyframes rev-pulse {
+    0%, 100% { transform: scale(1); opacity: 0.9; }
+    50%      { transform: scale(1.04); opacity: 1; }
+  }
+  @keyframes smoke-puff {
+    0%   { transform: translate(0,0) scale(0.6); opacity: 0; }
+    15%  { opacity: 0.7; }
+    100% { transform: translate(calc(var(--sx,-80px)), calc(var(--sy,-60px))) scale(1.8); opacity: 0; }
+  }
+  @keyframes tacho-sweep {
+    0%   { transform: rotate(-130deg); }
+    70%  { transform: rotate(55deg); }
+    100% { transform: rotate(40deg); }
+  }
+
+  .display { font-family: 'Bebas Neue', sans-serif; letter-spacing: 0.01em; }
+  .mono { font-family: 'JetBrains Mono', monospace; }
+  .eyebrow {
+    font-family: 'Outfit', sans-serif;
+    font-size: 11px;
+    letter-spacing: 0.4em;
+    text-transform: uppercase;
+    font-weight: 500;
+  }
+
+  input, select, textarea {
+    font-family: 'Outfit', sans-serif;
+    font-size: 15px;
+    color: #fff;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 8px;
+    padding: 14px 16px;
+    min-height: 50px;
+    width: 100%;
+    outline: none;
+    transition: border-color 0.3s, box-shadow 0.3s, background 0.3s;
+  }
+  input::placeholder, textarea::placeholder { color: rgba(255,255,255,0.25); }
+  input:focus, select:focus, textarea:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(59,130,246,0.15);
+    background: rgba(255,255,255,0.06);
+  }
+  select {
+    appearance: none;
+    -webkit-appearance: none;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'><path d='M1 1l5 5 5-5' stroke='%233B82F6' stroke-width='1.5' fill='none'/></svg>");
+    background-repeat: no-repeat;
+    background-position: right 16px center;
+    padding-right: 44px;
+  }
+  select option { background: #0a0a12; color: #fff; }
+  textarea { min-height: 120px; resize: vertical; line-height: 1.6; }
+
+  .btn-primary, .btn-ghost {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    font-family: 'Bebas Neue', sans-serif;
+    letter-spacing: 0.25em;
+    border-radius: 6px;
+    min-height: 52px;
+    padding: 16px 32px;
+    transition: transform 0.2s ease, box-shadow 0.3s ease, background 0.3s ease, filter 0.2s ease;
+    cursor: pointer;
+    will-change: transform;
+  }
+  .btn-primary {
+    background: linear-gradient(180deg, #4B8DF6, #3B82F6);
+    color: #fff;
+    box-shadow: 0 0 24px rgba(59,130,246,0.35), inset 0 1px 0 rgba(255,255,255,0.2);
+  }
+  .btn-primary:hover { filter: brightness(1.08); box-shadow: 0 0 40px rgba(59,130,246,0.55), inset 0 1px 0 rgba(255,255,255,0.25); transform: scale(1.02); }
+  .btn-primary:active { transform: scale(0.98); }
+  .btn-ghost {
+    background: transparent;
+    color: rgba(255,255,255,0.85);
+    border: 1px solid rgba(255,255,255,0.2);
+  }
+  .btn-ghost:hover { border-color: rgba(255,255,255,0.5); color: #fff; transform: scale(1.02); }
+  .btn-ghost:active { transform: scale(0.98); }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<svg style="position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:9998;opacity:0.04;mix-blend-mode:overlay" xmlns="http://www.w3.org/2000/svg">
+  <filter id="noiseFilter"><feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="3" stitchTiles="stitch"/></filter>
+  <rect width="100%" height="100%" filter="url(#noiseFilter)"/>
+</svg>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<script type="text/babel" src="src/primitives.jsx"></script>
+<script type="text/babel" src="src/app.jsx"></script>
+</body>
+</html>
