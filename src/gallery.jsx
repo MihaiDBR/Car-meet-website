@@ -13,19 +13,7 @@
 
 const { useState: gS, useEffect: gE, useRef: gR, useMemo: gM, useCallback: gC } = React;
 
-// 9 placeholder images — gradient + label. Swap `src: '/path/to/photo.jpg'`
-// to use real images. The gradient logic falls back if src is empty.
-const GALLERY_ITEMS = [
-  { id: 1, hue: 220, label: 'STANCE',  span: 'tall',  src: '' },
-  { id: 2, hue: 0,   label: 'DRIFT',   span: 'wide',  src: '' },
-  { id: 3, hue: 280, label: 'JDM',     span: '',      src: '' },
-  { id: 4, hue: 30,  label: 'EURO',    span: '',      src: '' },
-  { id: 5, hue: 200, label: 'GRID',    span: 'tall',  src: '' },
-  { id: 6, hue: 340, label: 'BURNOUT', span: 'wide',  src: '' },
-  { id: 7, hue: 160, label: 'SHOW',    span: '',      src: '' },
-  { id: 8, hue: 50,  label: 'NIGHT',   span: '',      src: '' },
-  { id: 9, hue: 260, label: 'TRACK',   span: 'wide',  src: '' },
-];
+// GALLERY_ITEMS → src/constants.js
 
 // Asymmetric mosaic — each item gets a span class. CSS grid handles the rest.
 // Tall = row-span 2, Wide = col-span 2. On mobile collapses to 2 cols normal.
@@ -456,30 +444,6 @@ function MosaicGallery() {
         onNavigate={navigate}
       />
 
-      <style>{`
-        .gallery-grid {
-          grid-template-columns: repeat(3, 1fr);
-          grid-auto-rows: 270px;
-          grid-auto-flow: row dense;
-        }
-        .gallery-card-tall { grid-row-end: span 2; }
-        .gallery-card-wide { grid-column-end: span 2; }
-
-        @media (min-width: 1400px) {
-          .gallery-grid { grid-auto-rows: 310px; }
-        }
-        @media (max-width: 900px) {
-          .gallery-grid {
-            grid-template-columns: repeat(2, 1fr);
-            grid-auto-rows: 200px;
-            gap: 10px;
-          }
-          .gallery-card-wide { grid-column-end: span 1; }
-        }
-        @media (max-width: 480px) {
-          .gallery-grid { grid-auto-rows: 160px; gap: 8px; }
-        }
-      `}</style>
     </section>
   );
 }
