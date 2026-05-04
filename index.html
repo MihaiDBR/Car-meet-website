@@ -139,16 +139,21 @@
 
   input, select, textarea {
     font-family: 'Outfit', sans-serif;
-    font-size: 15px;
+    /* 16px on mobile prevents iOS Safari from auto-zooming on focus */
+    font-size: 16px;
     color: #fff;
     background: rgba(255,255,255,0.04);
     border: 1px solid rgba(255,255,255,0.08);
     border-radius: 8px;
     padding: 14px 16px;
-    min-height: 50px;
+    /* 48px is comfortable touch-target height (Apple HIG min 44px) */
+    min-height: 48px;
     width: 100%;
     outline: none;
     transition: border-color 0.3s, box-shadow 0.3s, background 0.3s;
+  }
+  @media (min-width: 768px) {
+    input, select, textarea { font-size: 15px; }
   }
   input::placeholder, textarea::placeholder { color: rgba(255,255,255,0.25); }
   input:focus, select:focus, textarea:focus {
@@ -175,26 +180,34 @@
     font-family: 'Bebas Neue', sans-serif;
     letter-spacing: 0.25em;
     border-radius: 6px;
+    /* 52px keeps comfortable thumb target on mobile */
     min-height: 52px;
     padding: 16px 32px;
     transition: transform 0.2s ease, box-shadow 0.3s ease, background 0.3s ease, filter 0.2s ease;
     cursor: pointer;
     will-change: transform;
+    /* Disable iOS double-tap zoom + tap highlight for cleaner press feel */
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
   }
   .btn-primary {
     background: linear-gradient(180deg, #4B8DF6, #3B82F6);
     color: #fff;
     box-shadow: 0 0 24px rgba(59,130,246,0.35), inset 0 1px 0 rgba(255,255,255,0.2);
   }
-  .btn-primary:hover { filter: brightness(1.08); box-shadow: 0 0 40px rgba(59,130,246,0.55), inset 0 1px 0 rgba(255,255,255,0.25); transform: scale(1.02); }
-  .btn-primary:active { transform: scale(0.98); }
+  /* Hover only on devices that actually have a hover (i.e. not touch).
+     This prevents "stuck hover" state after tap on mobile. */
+  @media (hover: hover) {
+    .btn-primary:hover { filter: brightness(1.08); box-shadow: 0 0 40px rgba(59,130,246,0.55), inset 0 1px 0 rgba(255,255,255,0.25); transform: scale(1.02); }
+    .btn-ghost:hover { border-color: rgba(255,255,255,0.5); color: #fff; transform: scale(1.02); }
+  }
+  .btn-primary:active { transform: scale(0.98); filter: brightness(1.05); }
   .btn-ghost {
     background: transparent;
     color: rgba(255,255,255,0.85);
     border: 1px solid rgba(255,255,255,0.2);
   }
-  .btn-ghost:hover { border-color: rgba(255,255,255,0.5); color: #fff; transform: scale(1.02); }
-  .btn-ghost:active { transform: scale(0.98); }
+  .btn-ghost:active { transform: scale(0.98); border-color: rgba(255,255,255,0.4); }
 </style>
 </head>
 <body>
@@ -210,6 +223,7 @@
 <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
 
 <script type="text/babel" src="src/primitives.jsx"></script>
+<script type="text/babel" src="src/gallery.jsx"></script>
 <script type="text/babel" src="src/app.jsx"></script>
 </body>
 </html>

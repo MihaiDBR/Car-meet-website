@@ -91,7 +91,17 @@ function useMousePosition() {
 function SplitText({ children, split = 'chars', className = '', style = {}, stagger, delay = 0, as: Tag = 'span' }) {
   const ref = useRef(null);
   const inView = useInView(ref, { threshold: 0.15 });
-  const text = typeof children === 'string' ? children : String(children);
+  // Recursively flatten React children into a plain string.
+  // Direct String(child) yields "[object Object]" when the build pipeline
+  // wraps text nodes in editor-instrumented elements — walk into them instead.
+  const flatten = (node) => {
+    if (node == null || node === false) return '';
+    if (typeof node === 'string' || typeof node === 'number') return String(node);
+    if (Array.isArray(node)) return node.map(flatten).join('');
+    if (React.isValidElement(node)) return flatten(node.props && node.props.children);
+    return '';
+  };
+  const text = flatten(children);
   const parts = split === 'words' ? text.split(' ') : Array.from(text);
   const step = stagger ?? (split === 'words' ? 80 : 30);
   return (

@@ -386,107 +386,6 @@ function Stats() {
   );
 }
 
-// ---------- SPEED TEASER DIVIDER ----------
-
-function SpeedTeaser() {
-  const ref = uR(null);
-  const [prog, setProg] = uS(0);
-
-  uE(() => {
-    const update = () => {
-      if (!ref.current) return;
-      const rect = ref.current.getBoundingClientRect();
-      const p = Math.max(0, Math.min(1, (window.innerHeight * 0.65 - rect.top) / (window.innerHeight * 0.65)));
-      setProg(p);
-    };
-    window.addEventListener('scroll', update, { passive: true });
-    window.addEventListener('resize', update, { passive: true });
-    update();
-    return () => {
-      window.removeEventListener('scroll', update);
-      window.removeEventListener('resize', update);
-    };
-  }, []);
-
-  const entered = prog > 0.12;
-  const glowOpacity = (prog * 0.22).toFixed(3);
-
-  return (
-    <div ref={ref} style={{
-      position: 'relative', height: 260,
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      overflow: 'hidden',
-      borderTop: '1px solid rgba(255,255,255,0.04)',
-      borderBottom: '1px solid rgba(255,255,255,0.04)',
-    }}>
-      {/* Radial glow that brightens as section enters view */}
-      <div style={{
-        position: 'absolute', inset: 0, pointerEvents: 'none',
-        background: `radial-gradient(ellipse 80% 140% at 50% 50%, rgba(59,130,246,${glowOpacity}), transparent 65%)`,
-        transition: 'background 0.1s linear',
-      }}/>
-
-      {/* Speed lines radiating from center */}
-      <svg
-        style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none' }}
-        viewBox="0 0 1440 260"
-        preserveAspectRatio="xMidYMid slice"
-      >
-        {Array.from({ length: 28 }, (_, i) => {
-          const angle = (i / 28) * Math.PI * 2;
-          const cx = 720, cy = 130;
-          const inner = 20 + prog * 60;
-          const rawOuter = inner + 30 + prog * 380;
-          const outer = Math.min(rawOuter, 820);
-          const alpha = (0.04 + prog * 0.14).toFixed(3);
-          return (
-            <line key={i}
-              x1={cx + Math.cos(angle) * inner}
-              y1={cy + Math.sin(angle) * inner}
-              x2={cx + Math.cos(angle) * outer}
-              y2={cy + Math.sin(angle) * outer}
-              stroke={`rgba(59,130,246,${alpha})`}
-              strokeWidth={0.6 + prog * 0.5}
-            />
-          );
-        })}
-      </svg>
-
-      {/* Center content */}
-      <div style={{ position: 'relative', zIndex: 2, textAlign: 'center', userSelect: 'none' }}>
-        <div className="mono" style={{
-          fontSize: 10, color: 'var(--accent)', letterSpacing: '0.45em',
-          marginBottom: 16, textTransform: 'uppercase',
-          opacity: entered ? 1 : 0,
-          transform: entered ? 'translateY(0)' : 'translateY(10px)',
-          transition: 'opacity 0.55s ease, transform 0.55s ease',
-        }}>
-          STADIONUL STEAUA · BUCUREȘTI
-        </div>
-        <div className="display" style={{
-          fontSize: 'clamp(50px, 8vw, 112px)',
-          lineHeight: 0.9, letterSpacing: '-0.01em', color: '#fff',
-          textShadow: `0 0 ${30 + prog * 80}px rgba(59,130,246,${(0.15 + prog * 0.4).toFixed(3)})`,
-          opacity: entered ? 1 : 0,
-          transform: `translateY(${entered ? 0 : 18}px) scale(${entered ? 1 : 0.93})`,
-          transition: 'opacity 0.65s ease, transform 0.65s ease, text-shadow 0.1s linear',
-        }}>
-          13 · 06 · 2026
-        </div>
-        <div className="mono" style={{
-          fontSize: 10, color: 'var(--text-muted)', letterSpacing: '0.4em',
-          marginTop: 16, textTransform: 'uppercase',
-          opacity: entered ? 1 : 0,
-          transform: entered ? 'translateY(0)' : 'translateY(-8px)',
-          transition: 'opacity 0.55s 0.12s ease, transform 0.55s 0.12s ease',
-        }}>
-          ↓ COUNTDOWN ↓
-        </div>
-      </div>
-    </div>
-  );
-}
-
 // ---------- COUNTDOWN ----------
 
 function Countdown() {
@@ -741,8 +640,6 @@ const TOTAL_FRAMES = 150; // fps=25 × 6s
 function Car360Showcase() {
   const wrapperRef = uR(null);
   const canvasRef = uR(null);
-  const backdropCanvasRef = uR(null); // mobile only — blurred full-cover backdrop
-  const stageRef = uR(null); // mobile only — fixed-size animation stage
   const progressBarRef = uR(null);
   const bitmapsRef = uR(null); // ImageBitmap[] — null until all pre-decoded
   const isMobile = useIsMobile();
@@ -794,56 +691,23 @@ function Car360Showcase() {
   }, []);
 
   // rAF draw loop — only draws pre-decoded ImageBitmaps
-  // Smoothed frame index: target follows scroll, current eases toward target
-  // → produces buttery parallax feel + handles direction (down=forward, up=reverse) automatically
-  // Mobile: also draws a blurred/dimmed full-cover backdrop on a second canvas
-  // so the empty space around the centered animation is filled cinematically.
   uE(() => {
     const canvas = canvasRef.current;
     const wrapper = wrapperRef.current;
     if (!canvas || !wrapper) return;
 
     const ctx = canvas.getContext('2d', { alpha: false });
-    const backdropCanvas = backdropCanvasRef.current;
-    const backdropCtx = backdropCanvas ? backdropCanvas.getContext('2d', { alpha: false }) : null;
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
     let rafId;
     let lastIdx = -1;
-    let currentFrame = 0; // smoothed (lerped) frame position
-    let targetFrame = 0;  // raw scroll-mapped frame position
-    // Smoothing factor — higher = snappier, lower = silkier glide.
-    // Mobile: snappier (0.30) because touch-scroll already has inertia.
-    // Desktop: silkier (0.18) for that Apple-style scroll-rotation parallax.
-    const EASE = isMobile ? 0.30 : 0.18;
-
-    function getStageRect() {
-      // On mobile we draw into a fixed-size stage element instead of the full viewport.
-      const stage = stageRef.current;
-      if (isMobile && stage) {
-        const r = stage.getBoundingClientRect();
-        return { w: r.width, h: r.height };
-      }
-      return { w: window.innerWidth, h: window.innerHeight };
-    }
 
     function resize() {
-      const { w, h } = getStageRect();
-      canvas.width = Math.max(1, w * dpr);
-      canvas.height = Math.max(1, h * dpr);
+      canvas.width = window.innerWidth * dpr;
+      canvas.height = window.innerHeight * dpr;
       canvas.style.width = '100%';
       canvas.style.height = '100%';
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.scale(dpr, dpr);
-
-      // Backdrop canvas always sized to viewport on mobile
-      if (backdropCtx && backdropCanvas) {
-        backdropCanvas.width = Math.max(1, window.innerWidth * dpr);
-        backdropCanvas.height = Math.max(1, window.innerHeight * dpr);
-        backdropCanvas.style.width = '100%';
-        backdropCanvas.style.height = '100%';
-        backdropCtx.setTransform(1, 0, 0, 1, 0, 0);
-        backdropCtx.scale(dpr, dpr);
-      }
       lastIdx = -1;
     }
 
@@ -851,13 +715,13 @@ function Car360Showcase() {
       const bw = bm.width ?? bm.naturalWidth;
       const bh = bm.height ?? bm.naturalHeight;
       if (!bw || !bh) return;
-      const { w: vw, h: vh } = getStageRect();
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
       const vAspect = bw / bh;
       const cAspect = vw / vh;
       let dw, dh, dx, dy;
       if (isMobile) {
-        // Cover the stage — fills edge-to-edge, no black bars.
-        const scale = Math.max(vw / bw, vh / bh);
+        const scale = Math.min(vw / bw, vh / bh);
         dw = bw * scale; dh = bh * scale;
         dx = (vw - dw) / 2; dy = (vh - dh) / 2;
       } else if (cAspect > vAspect) {
@@ -868,24 +732,6 @@ function Car360Showcase() {
       ctx.fillStyle = '#06060A';
       ctx.fillRect(0, 0, vw, vh);
       ctx.drawImage(bm, dx, dy, dw, dh);
-
-      // Mobile backdrop: same frame, scaled to COVER full viewport, heavily blurred + dimmed.
-      // This fills the area around the contained stage with ambient color, no dead black.
-      if (backdropCtx && isMobile) {
-        const bvw = window.innerWidth;
-        const bvh = window.innerHeight;
-        const bScale = Math.max(bvw / bw, bvh / bh) * 1.15; // 1.15× zoom to hide blur edges
-        const bdw = bw * bScale;
-        const bdh = bh * bScale;
-        const bdx = (bvw - bdw) / 2;
-        const bdy = (bvh - bdh) / 2;
-        backdropCtx.fillStyle = '#06060A';
-        backdropCtx.fillRect(0, 0, bvw, bvh);
-        backdropCtx.save();
-        backdropCtx.filter = 'blur(48px) brightness(0.45) saturate(1.1)';
-        backdropCtx.drawImage(bm, bdx, bdy, bdw, bdh);
-        backdropCtx.restore();
-      }
     }
 
     const tick = () => {
@@ -895,24 +741,10 @@ function Car360Showcase() {
         const scrollDist = Math.max(1, wrapper.offsetHeight - window.innerHeight);
         const progress = Math.max(0, Math.min(1, -rect.top / scrollDist));
 
-        // Map scroll progress → target frame.
-        // Scrolling down increases progress → frame index goes up (rotates right).
-        // Scrolling up decreases progress → frame index goes down (rotates left).
-        targetFrame = progress * (TOTAL_FRAMES - 1);
-
-        // Lerp current toward target — this is what makes it feel parallax-smooth.
-        const delta = targetFrame - currentFrame;
-        if (Math.abs(delta) < 0.01) {
-          currentFrame = targetFrame;
-        } else {
-          currentFrame += delta * EASE;
-        }
-
-        const frameIdx = Math.round(currentFrame);
-        const safeIdx = Math.max(0, Math.min(TOTAL_FRAMES - 1, frameIdx));
-        if (safeIdx !== lastIdx && bitmaps[safeIdx]) {
-          drawBitmap(bitmaps[safeIdx]);
-          lastIdx = safeIdx;
+        const frameIdx = Math.round(progress * (TOTAL_FRAMES - 1));
+        if (frameIdx !== lastIdx && bitmaps[frameIdx]) {
+          drawBitmap(bitmaps[frameIdx]);
+          lastIdx = frameIdx;
         }
 
         if (progressBarRef.current) {
@@ -936,185 +768,12 @@ function Car360Showcase() {
     };
   }, [isMobile]);
 
-  // ===== MOBILE LAYOUT =====
-  // Same structure as desktop now: car canvas fills 100vh, text overlays absolutely
-  // on top and stays centered. COVER drawing means no black bars, so text-on-car works.
-  // Strong vignette + dark center gradient + brighter accent + heavier shadows for contrast.
-  if (isMobile) {
-    return (
-      <div ref={wrapperRef} style={{
-        height: '300vh',
-        position: 'relative',
-      }}>
-        <div style={{
-          position: 'sticky', top: 0, height: '100vh',
-          overflow: 'hidden',
-          background: '#06060A',
-          transform: 'translateZ(0)',
-          willChange: 'transform',
-        }}>
-          {/* Backdrop — blurred full-cover frame */}
-          <canvas
-            ref={backdropCanvasRef}
-            style={{
-              position: 'absolute', inset: 0, width: '100%', height: '100%',
-              zIndex: 0, pointerEvents: 'none',
-            }}
-          />
-
-          {/* Main car stage — fills full viewport (cover mode, no black bars) */}
-          <div ref={stageRef} style={{
-            position: 'absolute', inset: 0, zIndex: 1,
-          }}>
-            <canvas
-              ref={canvasRef}
-              style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}
-            />
-          </div>
-
-          {/* Strong vignette for text legibility */}
-          <div style={{
-            position: 'absolute', inset: 0, zIndex: 2, pointerEvents: 'none',
-            background: 'radial-gradient(ellipse at center, rgba(6,6,10,0.45) 0%, rgba(6,6,10,0.55) 45%, rgba(6,6,10,0.85) 90%, rgba(6,6,10,0.95) 100%)',
-          }}/>
-          {/* Extra horizontal band behind centered text for max contrast */}
-          <div style={{
-            position: 'absolute', inset: 0, zIndex: 2, pointerEvents: 'none',
-            background: 'linear-gradient(to bottom, transparent 0%, transparent 25%, rgba(6,6,10,0.55) 50%, transparent 75%, transparent 100%)',
-          }}/>
-
-          {/* TOP — meta row */}
-          <div style={{
-            position: 'absolute', top: 16, left: 16, right: 16, zIndex: 4,
-            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-            gap: 12, pointerEvents: 'none',
-          }}>
-            <span className="mono" style={{
-              fontSize: 10, color: '#7BB3FF', letterSpacing: '0.3em',
-              textShadow: '0 1px 12px rgba(0,0,0,0.95), 0 0 20px rgba(0,0,0,0.85)',
-            }}>[ 04 — SHOWCASE ]</span>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <span className="mono" style={{
-                fontSize: 9, color: 'rgba(255,255,255,0.85)', letterSpacing: '0.25em',
-                textShadow: '0 1px 12px rgba(0,0,0,0.95), 0 0 16px rgba(0,0,0,0.8)',
-              }}>{CAR360_SLIDES[activeSlide].chapter}</span>
-              <div style={{ width: 60, height: 1, background: 'rgba(255,255,255,0.25)', position: 'relative' }}>
-                <div ref={progressBarRef} style={{
-                  position: 'absolute', top: 0, left: 0, height: 1, width: '0%',
-                  background: 'var(--accent)', boxShadow: '0 0 8px var(--accent-glow)',
-                }}/>
-              </div>
-            </div>
-          </div>
-
-          {/* CENTER text — absolute, stacked slides, just like desktop */}
-          <div style={{
-            position: 'absolute', inset: 0, zIndex: 4,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            textAlign: 'center', padding: '0 20px', pointerEvents: 'none',
-          }}>
-            {CAR360_SLIDES.map((slide, i) => (
-              <div key={i} style={{
-                position: 'absolute', maxWidth: 480, padding: '0 16px',
-                opacity: i === activeSlide ? 1 : 0,
-                transform: i === activeSlide ? 'translateY(0)' : 'translateY(16px)',
-                transition: 'opacity 0.5s ease, transform 0.6s cubic-bezier(0.22,1,0.36,1)',
-              }}>
-                <div className="eyebrow" style={{
-                  fontSize: 10, color: '#7BB3FF', letterSpacing: '0.45em', marginBottom: 14,
-                  textShadow: '0 1px 16px rgba(0,0,0,0.95), 0 0 24px rgba(0,0,0,0.9), 0 0 40px rgba(59,130,246,0.4)',
-                  fontWeight: 600,
-                }}>{slide.eyebrow}</div>
-                <h3 className="display" style={{
-                  fontSize: 'clamp(40px, 11vw, 68px)',
-                  color: '#fff', lineHeight: 0.92, letterSpacing: '-0.01em', margin: 0,
-                  textShadow: '0 2px 32px rgba(0,0,0,0.95), 0 0 48px rgba(0,0,0,0.85), 0 0 80px rgba(59,130,246,0.25)',
-                }}>{slide.title}</h3>
-                <p style={{
-                  marginTop: 16, marginBottom: 0, maxWidth: 380, marginLeft: 'auto', marginRight: 'auto',
-                  fontSize: 13, lineHeight: 1.6,
-                  color: 'rgba(255,255,255,0.92)', fontWeight: 400,
-                  textShadow: '0 1px 14px rgba(0,0,0,0.98), 0 0 22px rgba(0,0,0,0.9)',
-                }}>{slide.desc}</p>
-              </div>
-            ))}
-          </div>
-
-          {/* BOTTOM — dots + hint */}
-          <div style={{
-            position: 'absolute', bottom: 24, left: 0, right: 0, zIndex: 4,
-            display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 16,
-            flexWrap: 'wrap', padding: '0 20px', pointerEvents: 'none',
-          }}>
-            <div style={{ display: 'flex', gap: 8 }}>
-              {CAR360_SLIDES.map((_, i) => (
-                <div key={i} style={{
-                  width: i === activeSlide ? 24 : 6, height: 2,
-                  background: i === activeSlide ? 'var(--accent)' : 'rgba(255,255,255,0.4)',
-                  boxShadow: i === activeSlide ? '0 0 8px var(--accent-glow)' : '0 0 6px rgba(0,0,0,0.6)',
-                  transition: 'width 0.4s ease, background 0.4s ease',
-                }}/>
-              ))}
-            </div>
-            <span className="mono" style={{
-              fontSize: 9, color: 'rgba(255,255,255,0.6)', letterSpacing: '0.3em',
-              textShadow: '0 1px 12px rgba(0,0,0,0.95), 0 0 16px rgba(0,0,0,0.85)',
-            }}>SCROLL TO EXPLORE</span>
-          </div>
-
-          {/* Loading overlay (mobile) */}
-          {!framesReady && !framesMissing && (
-            <div style={{
-              position: 'absolute', inset: 0, zIndex: 20,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              flexDirection: 'column', gap: 18,
-              background: '#06060A',
-            }}>
-              <div className="mono" style={{ fontSize: 11, color: 'var(--accent)', letterSpacing: '0.35em' }}>
-                LOADING · {Math.round(loadPct * 100)}%
-              </div>
-              <div style={{ width: 200, height: 1, background: 'rgba(255,255,255,0.08)', position: 'relative' }}>
-                <div style={{
-                  position: 'absolute', top: 0, left: 0, height: 1,
-                  width: `${loadPct * 100}%`,
-                  background: 'var(--accent)',
-                  boxShadow: '0 0 10px var(--accent-glow)',
-                  transition: 'width 0.12s linear',
-                }}/>
-              </div>
-            </div>
-          )}
-          {framesMissing && (
-            <div style={{
-              position: 'absolute', inset: 0, zIndex: 20,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              flexDirection: 'column', gap: 14, padding: 24, textAlign: 'center',
-              background: '#06060A',
-            }}>
-              <div className="mono" style={{ fontSize: 10, color: 'var(--accent)', letterSpacing: '0.35em' }}>FRAMES LIPSESC</div>
-              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', lineHeight: 1.7, fontFamily: 'JetBrains Mono, monospace' }}>
-                Rulează în terminal:<br/>
-                <span style={{ color: 'rgba(255,255,255,0.9)' }}>ffmpeg -i car_rotation.mp4 …</span>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-    );
-  }
-
-  // ===== DESKTOP LAYOUT (unchanged) =====
   return (
-    <div ref={wrapperRef} style={{
-      height: '500vh',
-      position: 'relative',
-    }}>
+    <div ref={wrapperRef} style={{ height: '300vh', position: 'relative' }}>
       <div style={{
         position: 'sticky', top: 0, height: '100vh',
         overflow: 'hidden',
         background: '#06060A',
-        transform: 'translateZ(0)',
-        willChange: 'transform',
       }}>
         <div style={{ position: 'absolute', inset: 0, overflow: 'hidden', zIndex: 0 }}>
           <canvas
@@ -1294,12 +953,14 @@ const PANELS = [
 ];
 
 function HorizontalCategories() {
+  const wide = useIsDesktopWide(1024);
   const sectionRef = uR(null);
   const trackRef = uR(null);
   const [progress, setProgress] = uS(0);
   const [activeIdx, setActiveIdx] = uS(0);
 
   uE(() => {
+    if (!wide) return;
     let raf;
     const tick = () => {
       const sec = sectionRef.current;
@@ -1317,9 +978,59 @@ function HorizontalCategories() {
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, []);
+  }, [wide]);
 
-  // Horizontal scroll on all screen sizes
+  // Mobile / tablet: stacked cards
+  if (!wide) {
+    return (
+      <section style={{ padding: '80px 20px' }}>
+        <div style={{ maxWidth: 740, margin: '0 auto' }}>
+          <Reveal>
+            <div style={{ marginBottom: 32, display: 'flex', gap: 16, alignItems: 'baseline', flexWrap: 'wrap' }}>
+              <span className="mono" style={{ fontSize: 10, color: 'var(--accent)', letterSpacing: '0.3em' }}>[ 05 — CATEGORII ]</span>
+              <span style={{ flex: 1, height: 1, background: 'var(--border)', minWidth: 40 }}/>
+            </div>
+          </Reveal>
+          <h2 className="display" style={{
+            fontSize: 'clamp(40px, 10vw, 72px)', lineHeight: 0.9, letterSpacing: '-0.01em', marginBottom: 36,
+          }}>
+            <div style={{ overflow: 'hidden' }}><SplitText split="words">PATRU LUMI.</SplitText></div>
+            <div style={{ overflow: 'hidden', color: 'var(--accent)' }}><SplitText split="words" delay={120}>UN STADION.</SplitText></div>
+          </h2>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            {PANELS.map((p, i) => (
+              <Reveal key={p.num} delay={i * 120}>
+                <div style={{
+                  position: 'relative',
+                  padding: '28px 22px',
+                  border: '1px solid var(--border)', borderRadius: 4,
+                  background: `linear-gradient(135deg, hsla(${p.hue}, 80%, 50%, 0.06), rgba(255,255,255,0.015))`,
+                  overflow: 'hidden',
+                }}>
+                  <div className="display" style={{
+                    position: 'absolute', top: -10, right: -4,
+                    fontSize: 170, color: 'rgba(255,255,255,0.04)',
+                    lineHeight: 0.8, pointerEvents: 'none',
+                  }}>{p.num}</div>
+                  <div style={{
+                    fontSize: 38, color: `hsl(${p.hue}, 80%, 65%)`, marginBottom: 12,
+                    textShadow: `0 0 20px hsla(${p.hue}, 80%, 55%, 0.5)`,
+                  }}>{p.icon}</div>
+                  <div className="mono" style={{
+                    fontSize: 10, color: 'var(--text-muted)', letterSpacing: '0.3em', marginBottom: 10,
+                  }}>PANEL {p.num} / 04</div>
+                  <div className="display" style={{ fontSize: 36, letterSpacing: '0.02em', marginBottom: 10 }}>{p.name}</div>
+                  <div style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.6, fontWeight: 300 }}>{p.desc}</div>
+                </div>
+              </Reveal>
+            ))}
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  // Desktop: horizontal scroll
   return (
     <section ref={sectionRef} style={{ position: 'relative', height: '400vh' }}>
       <div style={{
@@ -1878,7 +1589,7 @@ function App() {
       <Hero/>
       <Marquee text="DROPDOWN · CAR CULTURE · STANCE · TUNING · DRIFT · STADIONUL STEAUA · BUCUREȘTI"/>
       <Stats/>
-      <SpeedTeaser/>
+      <RoadDivider showCar/>
       <Countdown/>
       <About/>
       <TireTreadDivider/>
@@ -1886,7 +1597,6 @@ function App() {
       <HorizontalCategories/>
       <Marquee text="BMW · AUDI · PORSCHE · MERCEDES · VW · NISSAN · TOYOTA · MAZDA · HONDA · LAMBORGHINI" reverse/>
       <RegistrationForm/>
-      <MosaicGallery/>
       <FinalCTA/>
       <Footer/>
     </>
