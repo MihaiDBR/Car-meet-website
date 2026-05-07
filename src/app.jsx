@@ -743,7 +743,6 @@ function Car360Showcase() {
   const [framesReady, setFramesReady] = uS(false);
   const [framesMissing, setFramesMissing] = uS(false);
   const [videoReady, setVideoReady] = uS(false);
-  const [videoPrimed, setVideoPrimed] = uS(false);
 
   // Load + pre-decode all frames via createImageBitmap (DESKTOP ONLY).
   // Mobile uses the <video> path below — frame decoding crashes low-end devices.
@@ -952,57 +951,54 @@ function Car360Showcase() {
     };
   }, [isMobile]);
 
-  // ===== MOBILE: prime the <video> for currentTime seeking =====
-  // iOS Safari requires play() to be called once (then pause) before currentTime
-  // updates render visible frames. Without this, scroll-sync just shows the poster.
+  // ===== MOBILE: ensure video plays + mark ready when first frame is decoded =====
+  // No currentTime seeking — video runs as a continuous autoplay loop in background.
+  // This is the same pattern Apple uses on iPhone product pages.
   uE(() => {
     if (!isMobile) return;
     const video = videoRef.current;
     if (!video) return;
 
-    let cancelled = false;
+    const markReady = () => setVideoReady(true);
 
-    const prime = async () => {
-      if (cancelled) return;
-      try {
-        video.muted = true;
-        const p = video.play();
-        if (p && typeof p.then === 'function') await p;
-        if (cancelled) return;
-        video.pause();
-        video.currentTime = 0;
-      } catch (_) {
-        // autoplay blocked — try seeking anyway
-      }
-      if (!cancelled) {
-        setVideoPrimed(true);
-        setVideoReady(true);
-      }
+    // Try to start playback (most browsers allow muted autoplay).
+    // If blocked, retry on first user interaction (scroll/tap).
+    const tryPlay = () => {
+      const p = video.play();
+      if (p && typeof p.catch === 'function') p.catch(() => {});
     };
+    tryPlay();
 
-    if (video.readyState >= 2) {
-      prime();
-    } else {
-      const onReady = () => prime();
-      video.addEventListener('loadeddata', onReady, { once: true });
-      // Safety net — some iOS versions fire 'canplay' before 'loadeddata'
-      video.addEventListener('canplay', onReady, { once: true });
-      return () => {
-        cancelled = true;
-        video.removeEventListener('loadeddata', onReady);
-        video.removeEventListener('canplay', onReady);
-      };
+    if (video.readyState >= 2) markReady();
+    else {
+      video.addEventListener('loadeddata', markReady, { once: true });
+      video.addEventListener('canplay', markReady, { once: true });
+      video.addEventListener('error', markReady, { once: true });
     }
 
-    return () => { cancelled = true; };
+    // Fallback: drop the loader after 2.5s no matter what, so a slow/failed
+    // video never leaves the user staring at a spinner.
+    const timeout = setTimeout(markReady, 2500);
+
+    const onUserGesture = () => { tryPlay(); };
+    window.addEventListener('touchstart', onUserGesture, { once: true, passive: true });
+    window.addEventListener('scroll',     onUserGesture, { once: true, passive: true });
+
+    return () => {
+      clearTimeout(timeout);
+      video.removeEventListener('loadeddata', markReady);
+      video.removeEventListener('canplay', markReady);
+      video.removeEventListener('error', markReady);
+      window.removeEventListener('touchstart', onUserGesture);
+      window.removeEventListener('scroll', onUserGesture);
+    };
   }, [isMobile]);
 
-  // ===== MOBILE: scroll-driven currentTime + slide tracking =====
+  // ===== MOBILE: scroll-driven slide + progress bar (no video seeking) =====
   uE(() => {
     if (!isMobile) return;
     const wrapper = wrapperRef.current;
-    const video = videoRef.current;
-    if (!wrapper || !video) return;
+    if (!wrapper) return;
 
     let rafScheduled = false;
 
@@ -1011,15 +1007,6 @@ function Car360Showcase() {
       const rect = wrapper.getBoundingClientRect();
       const scrollDist = Math.max(1, wrapper.offsetHeight - window.innerHeight);
       const progress = Math.max(0, Math.min(1, -rect.top / scrollDist));
-
-      const dur = video.duration;
-      if (videoPrimed && dur && Number.isFinite(dur) && dur > 0) {
-        const target = progress * dur;
-        // Avoid redundant seeks (each seek is expensive on iOS)
-        if (Math.abs((video.currentTime || 0) - target) > 0.03) {
-          try { video.currentTime = target; } catch (_) {}
-        }
-      }
 
       if (progressBarRef.current) {
         progressBarRef.current.style.width = (progress * 100).toFixed(2) + '%';
@@ -1043,7 +1030,7 @@ function Car360Showcase() {
       window.removeEventListener('scroll', onScroll);
       window.removeEventListener('resize', onScroll);
     };
-  }, [isMobile, videoPrimed]);
+  }, [isMobile]);
 
   // ===== MOBILE LAYOUT =====
   // Replaced the 150-frame ImageBitmap canvas with a native <video> element.
@@ -1061,9 +1048,11 @@ function Car360Showcase() {
           transform: 'translateZ(0)',
           willChange: 'transform',
         }}>
-          {/* Main car stage — native HTML5 video, scroll-synced via currentTime */}
+          {/* Main car stage — autoplay loop video (Apple-style) */}
           <video
             ref={videoRef}
+            autoPlay
+            loop
             muted
             playsInline
             preload="auto"
