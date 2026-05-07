@@ -53,12 +53,21 @@ function useInView(ref, { threshold = 0.15, triggerOnce = true } = {}) {
 }
 
 function useScrollY() {
-  const [y, setY] = useState(0);
+  const [y, setY] = useState(typeof window !== 'undefined' ? window.scrollY : 0);
   useEffect(() => {
-    let raf;
-    const tick = () => { setY(window.scrollY); raf = requestAnimationFrame(tick); };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
+    let raf = null;
+    const onScroll = () => {
+      if (raf !== null) return;
+      raf = requestAnimationFrame(() => {
+        setY(window.scrollY);
+        raf = null;
+      });
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => {
+      window.removeEventListener('scroll', onScroll);
+      if (raf !== null) cancelAnimationFrame(raf);
+    };
   }, []);
   return y;
 }
@@ -578,14 +587,24 @@ function ScrollFrameCar({
 function ScrollProgressBar() {
   const [p, setP] = useState(0);
   useEffect(() => {
-    let raf;
-    const tick = () => {
+    let raf = null;
+    const compute = () => {
       const h = document.documentElement.scrollHeight - window.innerHeight;
       setP(h > 0 ? (window.scrollY / h) * 100 : 0);
-      raf = requestAnimationFrame(tick);
+      raf = null;
     };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
+    const onScroll = () => {
+      if (raf !== null) return;
+      raf = requestAnimationFrame(compute);
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', onScroll, { passive: true });
+    compute();
+    return () => {
+      window.removeEventListener('scroll', onScroll);
+      window.removeEventListener('resize', onScroll);
+      if (raf !== null) cancelAnimationFrame(raf);
+    };
   }, []);
   return (
     <div style={{

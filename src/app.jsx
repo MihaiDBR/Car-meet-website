@@ -173,7 +173,7 @@ function Hero() {
     }}>
       <HeadlightBeams/>
       <HeroAtmosphere/>
-      <ExhaustSmoke count={isMobile ? 10 : 22}/>
+      <ExhaustSmoke count={isMobile ? 0 : 22}/>
 
       {!isMobile && (
         <>
@@ -742,46 +742,70 @@ function Car360Showcase() {
   const [framesReady, setFramesReady] = uS(false);
   const [framesMissing, setFramesMissing] = uS(false);
 
-  // Load + pre-decode all frames via createImageBitmap
+  // Load + pre-decode all frames via createImageBitmap.
+  // Deferred: only starts when wrapper is within ~1.5 viewports of the screen,
+  // so mobile users don't pay 40MB of bandwidth + decode cost on first paint.
   uE(() => {
-    const bitmaps = new Array(TOTAL_FRAMES);
-    let decoded = 0;
+    const wrapper = wrapperRef.current;
+    if (!wrapper) return;
 
-    const finish = (bm, idx) => {
-      bitmaps[idx] = bm;
-      decoded++;
-      if (decoded % 10 === 0 || decoded >= TOTAL_FRAMES) {
-        setLoadPct(decoded / TOTAL_FRAMES);
-      }
-      if (decoded >= TOTAL_FRAMES) {
-        bitmapsRef.current = bitmaps;
-        setFramesReady(true);
-      }
+    let started = false;
+    const start = () => {
+      if (started) return;
+      started = true;
+
+      const bitmaps = new Array(TOTAL_FRAMES);
+      let decoded = 0;
+
+      const finish = (bm, idx) => {
+        bitmaps[idx] = bm;
+        decoded++;
+        if (decoded % 10 === 0 || decoded >= TOTAL_FRAMES) {
+          setLoadPct(decoded / TOTAL_FRAMES);
+        }
+        if (decoded >= TOTAL_FRAMES) {
+          bitmapsRef.current = bitmaps;
+          setFramesReady(true);
+        }
+      };
+
+      const decodeImg = (img, idx) => {
+        if (typeof createImageBitmap === 'function') {
+          createImageBitmap(img)
+            .then(bm => finish(bm, idx))
+            .catch(() => finish(img, idx));
+        } else {
+          finish(img, idx);
+        }
+      };
+
+      const probe = new Image();
+      probe.onerror = () => setFramesMissing(true);
+      probe.onload = () => {
+        decodeImg(probe, 0);
+        for (let i = 2; i <= TOTAL_FRAMES; i++) {
+          const img = new Image();
+          const idx = i - 1;
+          img.onload = () => decodeImg(img, idx);
+          img.onerror = () => finish(null, idx);
+          img.src = `frames/frame_${String(i).padStart(4, '0')}.jpg`;
+        }
+      };
+      probe.src = 'frames/frame_0001.jpg';
     };
 
-    const decodeImg = (img, idx) => {
-      if (typeof createImageBitmap === 'function') {
-        createImageBitmap(img)
-          .then(bm => finish(bm, idx))
-          .catch(() => finish(img, idx));
-      } else {
-        finish(img, idx);
-      }
-    };
+    if (typeof IntersectionObserver === 'function') {
+      const io = new IntersectionObserver((entries) => {
+        if (entries.some(e => e.isIntersecting)) {
+          start();
+          io.disconnect();
+        }
+      }, { rootMargin: '150% 0px 150% 0px' });
+      io.observe(wrapper);
+      return () => io.disconnect();
+    }
 
-    const probe = new Image();
-    probe.onerror = () => setFramesMissing(true);
-    probe.onload = () => {
-      decodeImg(probe, 0);
-      for (let i = 2; i <= TOTAL_FRAMES; i++) {
-        const img = new Image();
-        const idx = i - 1;
-        img.onload = () => decodeImg(img, idx);
-        img.onerror = () => finish(null, idx);
-        img.src = `frames/frame_${String(i).padStart(4, '0')}.jpg`;
-      }
-    };
-    probe.src = 'frames/frame_0001.jpg';
+    start();
   }, []);
 
   // rAF draw loop — only draws pre-decoded ImageBitmaps
@@ -1561,7 +1585,7 @@ function FinalCTA() {
         animation: 'pulse-glow 7s ease-in-out infinite',
         pointerEvents: 'none',
       }}/>
-      <ExhaustSmoke count={isMobile ? 12 : 24}/>
+      <ExhaustSmoke count={isMobile ? 0 : 24}/>
       <div style={{ position: 'relative', zIndex: 2, maxWidth: 1100, margin: '0 auto', textAlign: 'center' }}>
         <Reveal>
           <div className="eyebrow" style={{ color: 'var(--accent)', marginBottom: 28 }}>NE VEDEM PE STADION</div>
