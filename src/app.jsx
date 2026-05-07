@@ -732,20 +732,23 @@ function About() {
 function Car360Showcase() {
   const wrapperRef = uR(null);
   const canvasRef = uR(null);
-  const backdropCanvasRef = uR(null); // mobile only — blurred full-cover backdrop
-  const stageRef = uR(null); // mobile only — fixed-size animation stage
+  const backdropCanvasRef = uR(null); // desktop-only path uses these
+  const stageRef = uR(null);
   const progressBarRef = uR(null);
-  const bitmapsRef = uR(null); // ImageBitmap[] — null until all pre-decoded
+  const bitmapsRef = uR(null); // ImageBitmap[] — null until all pre-decoded (desktop only)
+  const videoRef = uR(null);   // mobile path — scroll-synced HTML5 video
   const isMobile = useIsMobile();
   const [activeSlide, setActiveSlide] = uS(0);
   const [loadPct, setLoadPct] = uS(0);
   const [framesReady, setFramesReady] = uS(false);
   const [framesMissing, setFramesMissing] = uS(false);
+  const [videoReady, setVideoReady] = uS(false);
+  const [videoPrimed, setVideoPrimed] = uS(false);
 
-  // Load + pre-decode all frames via createImageBitmap.
-  // Deferred: only starts when wrapper is within ~1.5 viewports of the screen,
-  // so mobile users don't pay 40MB of bandwidth + decode cost on first paint.
+  // Load + pre-decode all frames via createImageBitmap (DESKTOP ONLY).
+  // Mobile uses the <video> path below — frame decoding crashes low-end devices.
   uE(() => {
+    if (isMobile) return;
     const wrapper = wrapperRef.current;
     if (!wrapper) return;
 
@@ -806,14 +809,12 @@ function Car360Showcase() {
     }
 
     start();
-  }, []);
+  }, [isMobile]);
 
-  // rAF draw loop — only draws pre-decoded ImageBitmaps
-  // Smoothed frame index: target follows scroll, current eases toward target
-  // → produces buttery parallax feel + handles direction (down=forward, up=reverse) automatically
-  // Mobile: also draws a blurred/dimmed full-cover backdrop on a second canvas
-  // so the empty space around the centered animation is filled cinematically.
+  // rAF draw loop — DESKTOP ONLY. Draws pre-decoded ImageBitmaps onto canvas.
+  // Mobile uses the <video> + scroll-sync effects below.
   uE(() => {
+    if (isMobile) return;
     const canvas = canvasRef.current;
     const wrapper = wrapperRef.current;
     if (!canvas || !wrapper) return;
@@ -951,10 +952,102 @@ function Car360Showcase() {
     };
   }, [isMobile]);
 
+  // ===== MOBILE: prime the <video> for currentTime seeking =====
+  // iOS Safari requires play() to be called once (then pause) before currentTime
+  // updates render visible frames. Without this, scroll-sync just shows the poster.
+  uE(() => {
+    if (!isMobile) return;
+    const video = videoRef.current;
+    if (!video) return;
+
+    let cancelled = false;
+
+    const prime = async () => {
+      if (cancelled) return;
+      try {
+        video.muted = true;
+        const p = video.play();
+        if (p && typeof p.then === 'function') await p;
+        if (cancelled) return;
+        video.pause();
+        video.currentTime = 0;
+      } catch (_) {
+        // autoplay blocked — try seeking anyway
+      }
+      if (!cancelled) {
+        setVideoPrimed(true);
+        setVideoReady(true);
+      }
+    };
+
+    if (video.readyState >= 2) {
+      prime();
+    } else {
+      const onReady = () => prime();
+      video.addEventListener('loadeddata', onReady, { once: true });
+      // Safety net — some iOS versions fire 'canplay' before 'loadeddata'
+      video.addEventListener('canplay', onReady, { once: true });
+      return () => {
+        cancelled = true;
+        video.removeEventListener('loadeddata', onReady);
+        video.removeEventListener('canplay', onReady);
+      };
+    }
+
+    return () => { cancelled = true; };
+  }, [isMobile]);
+
+  // ===== MOBILE: scroll-driven currentTime + slide tracking =====
+  uE(() => {
+    if (!isMobile) return;
+    const wrapper = wrapperRef.current;
+    const video = videoRef.current;
+    if (!wrapper || !video) return;
+
+    let rafScheduled = false;
+
+    const compute = () => {
+      rafScheduled = false;
+      const rect = wrapper.getBoundingClientRect();
+      const scrollDist = Math.max(1, wrapper.offsetHeight - window.innerHeight);
+      const progress = Math.max(0, Math.min(1, -rect.top / scrollDist));
+
+      const dur = video.duration;
+      if (videoPrimed && dur && Number.isFinite(dur) && dur > 0) {
+        const target = progress * dur;
+        // Avoid redundant seeks (each seek is expensive on iOS)
+        if (Math.abs((video.currentTime || 0) - target) > 0.03) {
+          try { video.currentTime = target; } catch (_) {}
+        }
+      }
+
+      if (progressBarRef.current) {
+        progressBarRef.current.style.width = (progress * 100).toFixed(2) + '%';
+      }
+
+      const idx = Math.min(3, Math.floor(progress * 4));
+      setActiveSlide((prev) => (prev === idx ? prev : idx));
+    };
+
+    const onScroll = () => {
+      if (rafScheduled) return;
+      rafScheduled = true;
+      requestAnimationFrame(compute);
+    };
+
+    window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', onScroll, { passive: true });
+    compute();
+
+    return () => {
+      window.removeEventListener('scroll', onScroll);
+      window.removeEventListener('resize', onScroll);
+    };
+  }, [isMobile, videoPrimed]);
+
   // ===== MOBILE LAYOUT =====
-  // Same structure as desktop now: car canvas fills 100vh, text overlays absolutely
-  // on top and stays centered. COVER drawing means no black bars, so text-on-car works.
-  // Strong vignette + dark center gradient + brighter accent + heavier shadows for contrast.
+  // Replaced the 150-frame ImageBitmap canvas with a native <video> element.
+  // Browser streams the MP4 on demand — no 700MB RAM spike, no crash on Android.
   if (isMobile) {
     return (
       <div ref={wrapperRef} style={{
@@ -968,24 +1061,24 @@ function Car360Showcase() {
           transform: 'translateZ(0)',
           willChange: 'transform',
         }}>
-          {/* Backdrop — blurred full-cover frame */}
-          <canvas
-            ref={backdropCanvasRef}
+          {/* Main car stage — native HTML5 video, scroll-synced via currentTime */}
+          <video
+            ref={videoRef}
+            muted
+            playsInline
+            preload="auto"
+            poster="frames/frame_0001.jpg"
+            disableRemotePlayback
             style={{
-              position: 'absolute', inset: 0, width: '100%', height: '100%',
-              zIndex: 0, pointerEvents: 'none',
+              position: 'absolute', inset: 0,
+              width: '100%', height: '100%',
+              objectFit: 'cover',
+              zIndex: 1,
+              backgroundColor: '#06060A',
             }}
-          />
-
-          {/* Main car stage — fills full viewport (cover mode, no black bars) */}
-          <div ref={stageRef} style={{
-            position: 'absolute', inset: 0, zIndex: 1,
-          }}>
-            <canvas
-              ref={canvasRef}
-              style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}
-            />
-          </div>
+          >
+            <source src="car_rotation.mp4" type="video/mp4" />
+          </video>
 
           {/* Strong vignette for text legibility */}
           <div style={{
@@ -1077,42 +1170,27 @@ function Car360Showcase() {
             }}>SCROLL TO EXPLORE</span>
           </div>
 
-          {/* Loading overlay (mobile) */}
-          {!framesReady && !framesMissing && (
-            <div style={{
-              position: 'absolute', inset: 0, zIndex: 20,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              flexDirection: 'column', gap: 18,
-              background: '#06060A',
-            }}>
-              <div className="mono" style={{ fontSize: 11, color: 'var(--accent)', letterSpacing: '0.35em' }}>
-                LOADING · {Math.round(loadPct * 100)}%
-              </div>
-              <div style={{ width: 200, height: 1, background: 'rgba(255,255,255,0.08)', position: 'relative' }}>
-                <div style={{
-                  position: 'absolute', top: 0, left: 0, height: 1,
-                  width: `${loadPct * 100}%`,
-                  background: 'var(--accent)',
-                  boxShadow: '0 0 10px var(--accent-glow)',
-                  transition: 'width 0.12s linear',
-                }}/>
-              </div>
+          {/* Loading overlay (mobile) — fades out the moment video is primed */}
+          <div style={{
+            position: 'absolute', inset: 0, zIndex: 20,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            flexDirection: 'column', gap: 18,
+            background: '#06060A',
+            opacity: videoReady ? 0 : 1,
+            pointerEvents: videoReady ? 'none' : 'auto',
+            transition: 'opacity 0.5s ease',
+          }}>
+            <div className="mono" style={{ fontSize: 11, color: 'var(--accent)', letterSpacing: '0.35em' }}>
+              LOADING SHOWCASE
             </div>
-          )}
-          {framesMissing && (
             <div style={{
-              position: 'absolute', inset: 0, zIndex: 20,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              flexDirection: 'column', gap: 14, padding: 24, textAlign: 'center',
-              background: '#06060A',
-            }}>
-              <div className="mono" style={{ fontSize: 10, color: 'var(--accent)', letterSpacing: '0.35em' }}>FRAMES LIPSESC</div>
-              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', lineHeight: 1.7, fontFamily: 'JetBrains Mono, monospace' }}>
-                Rulează în terminal:<br/>
-                <span style={{ color: 'rgba(255,255,255,0.9)' }}>ffmpeg -i car_rotation.mp4 …</span>
-              </div>
-            </div>
-          )}
+              width: 28, height: 28,
+              border: '2px solid rgba(255,255,255,0.08)',
+              borderTopColor: 'var(--accent)',
+              borderRadius: '50%',
+              animation: 'spin-slow 1s linear infinite',
+            }}/>
+          </div>
         </div>
       </div>
     );
