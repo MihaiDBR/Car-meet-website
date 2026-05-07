@@ -1861,7 +1861,7 @@ function App() {
     <>
       <ScrollProgressBar/>
       <Nav/>
-      <Hero/>
+      <HeroPremium/>
       <Marquee text="DROPDOWN · CAR CULTURE · STANCE · TUNING · DRIFT · STADIONUL STEAUA · BUCUREȘTI"/>
       <Stats/>
       <SpeedTeaser/>
